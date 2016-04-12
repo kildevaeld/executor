@@ -209,7 +209,7 @@ type ServiceDesc struct {
 	Methods []MethodDesc
 }
 
-func (self *Executor) GetServices() (servs []ServiceDesc) {
+/*func (self *Executor) GetServices() (servs []ServiceDesc) {
 	self.mutex.RLock()
 	defer self.mutex.RUnlock()
 
@@ -232,9 +232,38 @@ func (self *Executor) GetServices() (servs []ServiceDesc) {
 		servs = append(servs, s)
 	}
 	return
+}*/
+func (self *Executor) GetServiceDescriptions() ([]byte, error) {
+
+	out, err := self.getDescriptions()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(out)
+
 }
 
-func (self *Executor) GetDescription(name string) ([]byte, error) {
+func (self *Executor) getDescriptions() (dict.Map, error) {
+	out := dict.NewMap()
+
+	for name, _ := range self.services {
+
+		/*bs, err := self.GetServiceDescription(name)
+
+		if err != nil {
+			return nil, err
+		}*/
+
+		desc, _ := self.getDescription(name)
+		out[name] = desc
+	}
+
+	return out, nil
+}
+
+func (self *Executor) getDescription(name string) (dict.Map, error) {
 	srv := self.services[name]
 
 	if srv == nil {
@@ -271,6 +300,16 @@ func (self *Executor) GetDescription(name string) ([]byte, error) {
 
 	}
 	out["methods"] = methods
+
+	return out, nil
+}
+
+func (self *Executor) GetServiceDescription(name string) ([]byte, error) {
+	out, err := self.getDescription(name)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return json.MarshalIndent(out, "", "  ")
 
