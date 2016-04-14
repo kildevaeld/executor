@@ -7,16 +7,17 @@ import (
 )
 
 type MessageType uint8
+type MsgId uint16
 
 const (
 	RequestMsg MessageType = iota + 1
 	ResponseMsg
-
+	ErrorMsg
 	SchemaRequestMsg
-	SchemaResponsMsg
+	SchemaResponseMsg
 )
 
-func writeHeader(writer io.Writer, id uint16, length uint32, msgType MessageType) error {
+func writeHeader(writer io.Writer, id MsgId, length uint32, msgType MessageType) error {
 
 	// Write id
 	var idb [2]byte
@@ -29,7 +30,7 @@ func writeHeader(writer io.Writer, id uint16, length uint32, msgType MessageType
 		return errors.New("could not write msgtype")
 	}
 
-	binary.LittleEndian.PutUint16(idb[:], id)
+	binary.LittleEndian.PutUint16(idb[:], uint16(id))
 	w, err = writer.Write(idb[:])
 	if err != nil || w != 2 {
 		return errors.New("could not write id")
@@ -44,7 +45,7 @@ func writeHeader(writer io.Writer, id uint16, length uint32, msgType MessageType
 	return nil
 }
 
-func readHeader(reader io.Reader) (id uint16, length uint32, msgType MessageType, err error) {
+func readHeader(reader io.Reader) (id MsgId, length uint32, msgType MessageType, err error) {
 	var idb [2]byte
 	var lnb [4]byte
 	var mtb [1]byte
@@ -61,7 +62,7 @@ func readHeader(reader io.Reader) (id uint16, length uint32, msgType MessageType
 	if err != nil || r != 2 {
 		return 0, 0, 0, errors.New("could not get id of message")
 	}
-	id = binary.LittleEndian.Uint16(idb[:])
+	id = MsgId(binary.LittleEndian.Uint16(idb[:]))
 
 	r, err = reader.Read(lnb[:])
 	if err != nil || r != 4 {
@@ -72,7 +73,7 @@ func readHeader(reader io.Reader) (id uint16, length uint32, msgType MessageType
 	return
 }
 
-func readMessage(reader io.Reader) (msg []byte, id uint16, msgType MessageType, err error) {
+func readMessage(reader io.Reader) (msg []byte, id MsgId, msgType MessageType, err error) {
 	/*var idb [2]byte
 	idr, ide := reader.Read(idb[:])
 
@@ -121,7 +122,7 @@ func readMessage(reader io.Reader) (msg []byte, id uint16, msgType MessageType, 
 
 }
 
-func writeMessage(writer io.Writer, id uint16, msgType MessageType, bs []byte) error {
+func writeMessage(writer io.Writer, id MsgId, msgType MessageType, bs []byte) error {
 	length := len(bs)
 	left := length
 

@@ -13,7 +13,7 @@ type Client struct {
 
 func (self *Client) Connect() error {
 
-	conn, err := net.Dial("tcp", ":4000")
+	conn, err := net.Dial("tcp", ":3000")
 
 	if err != nil {
 		return err
@@ -21,4 +21,19 @@ func (self *Client) Connect() error {
 
 	self.channel = NewChannel(getID(), self.executor, conn)
 
+	err = self.channel.Handle()
+
+	if err != nil {
+		return err
+	}
+
+	self.channel.RequestServices()
+
+	return nil
+}
+
+func NewClient() *Client {
+	return &Client{
+		executor: executor.NewExecutor(),
+	}
 }

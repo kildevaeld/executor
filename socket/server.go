@@ -32,6 +32,10 @@ type Server struct {
 	channels map[int]*Channel
 }
 
+func (self *Server) Exectutor() *executor.Executor {
+	return self.executor
+}
+
 func (self *Server) Serve() error {
 
 	l, e := net.Listen("tcp", ":3000")
@@ -75,8 +79,8 @@ func (self *Server) Call(method string, ctx interface{}, arg interface{}, reply 
 }
 
 func (self *Server) Register(name string, v interface{}) error {
+	return self.executor.Register(name, v)
 
-	return nil
 }
 
 func NewServer() *Server {

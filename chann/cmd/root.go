@@ -43,11 +43,16 @@ to quickly create a Cobra application.`,
 
 		server.Register("Service", &Service{})
 
-		err := server.Serve()
+		bs, err := server.Exectutor().GetServiceDescription("Service")
+
+		fmt.Printf("%s - %v\n", bs, err)
+
+		err = server.Serve()
 
 		if err != nil {
 			fmt.Print("Err %s", err)
 		}
+
 	},
 }
 

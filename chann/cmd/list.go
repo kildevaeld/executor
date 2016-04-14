@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/kildevaeld/executor/socket"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +34,14 @@ to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
 		fmt.Println("list called")
+
+		client := socket.NewClient()
+
+		err := client.Connect()
+		if err != nil {
+			fmt.Printf("%v\n", err)
+		}
+
 	},
 }
 

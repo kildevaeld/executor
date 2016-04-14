@@ -199,40 +199,17 @@ func getValue(v reflect.Type, value interface{}) (interface{}, error) {
 }
 
 type MethodDesc struct {
-	Name string
-	Arg  string
-	Ret  string
+	Name  string                 `json:"name"`
+	Ctx   map[string]interface{} `json:"ctx"`
+	Arg   map[string]interface{} `json:"arg"`
+	Reply map[string]interface{} `json:"reply"`
 }
 
 type ServiceDesc struct {
-	Name    string
-	Methods []MethodDesc
+	Name    string       `json:"name"`
+	Methods []MethodDesc `methods:"methods"`
 }
 
-/*func (self *Executor) GetServices() (servs []ServiceDesc) {
-	self.mutex.RLock()
-	defer self.mutex.RUnlock()
-
-	for k, v := range self.services {
-		s := ServiceDesc{}
-		s.Name = k
-
-		for _, name := range v.MethodNames() {
-
-			m := v.Method(name)
-
-			mDesc := MethodDesc{
-				Name: name,
-				Arg:  m.ArgType().Name(),
-				Ret:  m.ReplyType().Name(),
-			}
-			s.Methods = append(s.Methods, mDesc)
-		}
-
-		servs = append(servs, s)
-	}
-	return
-}*/
 func (self *Executor) GetServiceDescriptions() ([]byte, error) {
 
 	out, err := self.getDescriptions()
@@ -245,8 +222,8 @@ func (self *Executor) GetServiceDescriptions() ([]byte, error) {
 
 }
 
-func (self *Executor) getDescriptions() (dict.Map, error) {
-	out := dict.NewMap()
+func (self *Executor) getDescriptions() ([]ServiceDesc, error) {
+	var out []ServiceDesc
 
 	for name, _ := range self.services {
 
@@ -256,23 +233,26 @@ func (self *Executor) getDescriptions() (dict.Map, error) {
 			return nil, err
 		}*/
 
-		desc, _ := self.getDescription(name)
-		out[name] = desc
+		desc, e := self.getDescription(name)
+		if e != nil {
+			return nil, nil
+		}
+		out = append(out, desc)
 	}
 
 	return out, nil
 }
 
-func (self *Executor) getDescription(name string) (dict.Map, error) {
+func (self *Executor) getDescription(name string) (ServiceDesc, error) {
 	srv := self.services[name]
 
 	if srv == nil {
-		return nil, nil
+		return ServiceDesc{}, errors.New("service does not exists")
 	}
 
-	out := dict.NewMap()
-	out["name"] = name
-	methods := dict.NewMap()
+	out := ServiceDesc{
+		Name: name,
+	}
 
 	for _, name := range srv.MethodNames() {
 
@@ -280,26 +260,26 @@ func (self *Executor) getDescription(name string) (dict.Map, error) {
 		var ctx, arg, reply dict.Map
 		var err error
 		if arg, err = getType(m.ArgType()); err != nil {
-			return nil, err
+			return ServiceDesc{}, err
 		}
 		if ctx, err = getType(m.CtxType()); err != nil {
-			return nil, err
+			return ServiceDesc{}, err
 		}
 
 		if reply, err = getType(m.CtxType()); err != nil {
-			return nil, err
+			return ServiceDesc{}, err
 		}
 
-		args := dict.NewMap()
+		method := MethodDesc{
+			Name:  name,
+			Ctx:   ctx,
+			Arg:   arg,
+			Reply: reply,
+		}
 
-		args["ctx"] = ctx
-		args["arg"] = arg
-		args["reply"] = reply
-
-		methods[name] = args
+		out.Methods = append(out.Methods, method)
 
 	}
-	out["methods"] = methods
 
 	return out, nil
 }
