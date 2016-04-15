@@ -16,6 +16,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/kildevaeld/executor/socket"
 	"github.com/spf13/cobra"
@@ -32,14 +34,44 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Work your own magic here
-		fmt.Println("list called")
 
 		client := socket.NewClient()
 
 		err := client.Connect()
 		if err != nil {
 			fmt.Printf("%v\n", err)
+			os.Exit(1)
+		}
+
+		services := client.GetServices()
+
+		if len(args) == 1 {
+			service := services.Get(args[0])
+
+			if service == nil {
+				fmt.Printf("Service %s does not exists\n", service)
+				return
+			}
+			fmt.Printf("Service: %s\nMethods:\n", service.Name)
+			var out []string
+			for _, m := range service.Methods {
+				out = append(out, fmt.Sprintf("%s", m.Name))
+			}
+
+			fmt.Printf("  %s\n", strings.Join(out, ", "))
+
+		} else if len(args) > 1 {
+			service := services.Get(args[0])
+			if service == nil {
+				fmt.Printf("Service %s does not exists\n", service)
+				return
+			}
+			//fmt.Printf("Service: %s\nMethods: %s\n", service.Name)
+		} else {
+			fmt.Printf("Services:\n")
+			for _, service := range services {
+				fmt.Printf("  %s\n", service.Name)
+			}
 		}
 
 	},

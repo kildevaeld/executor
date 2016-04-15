@@ -74,24 +74,7 @@ func readHeader(reader io.Reader) (id MsgId, length uint32, msgType MessageType,
 }
 
 func readMessage(reader io.Reader) (msg []byte, id MsgId, msgType MessageType, err error) {
-	/*var idb [2]byte
-	idr, ide := reader.Read(idb[:])
 
-	if ide != nil || idr != 2 {
-		return nil, 0, errors.New("could not get id of message")
-	}
-
-	id := binary.LittleEndian.Uint16(idb[:])
-
-	var b [4]byte
-	r, e := reader.Read(b[:])
-
-	if e != nil || r != 4 {
-		// handler error
-		return nil, 0, errors.New("could no get length of message")
-	}
-
-	length := int(binary.LittleEndian.Uint32(b[:]))*/
 	var length uint32
 	id, length, msgType, err = readHeader(reader)
 
@@ -111,12 +94,6 @@ func readMessage(reader io.Reader) (msg []byte, id MsgId, msgType MessageType, e
 
 		left -= uint32(r)
 	}
-	/*var out executor.CallDescription
-	err := json.Unmarshal(read[:], &out)
-
-	if err != nil {
-		return nil, err
-	}*/
 
 	return
 
@@ -125,30 +102,6 @@ func readMessage(reader io.Reader) (msg []byte, id MsgId, msgType MessageType, e
 func writeMessage(writer io.Writer, id MsgId, msgType MessageType, bs []byte) error {
 	length := len(bs)
 	left := length
-
-	/*var idb [2]byte
-	binary.LittleEndian.PutUint16(idb[:], id)
-	idw, ide := writer.Write(idb[:])
-
-	if ide != nil {
-		return ide
-	}
-
-	if idw != 2 {
-		return errors.New("could not write id")
-	}
-
-	var l [4]byte
-	binary.LittleEndian.PutUint32(l[:], uint32(length))
-
-	w, err := writer.Write(l[:])
-
-	if err != nil {
-		return err
-	}
-	if w != 4 {
-		return errors.New("could not write length")
-	}*/
 
 	if err := writeHeader(writer, id, uint32(length), msgType); err != nil {
 		return err

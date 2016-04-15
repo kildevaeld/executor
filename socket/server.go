@@ -1,6 +1,7 @@
 package socket
 
 import (
+	"fmt"
 	"net"
 	"sync"
 
@@ -69,12 +70,29 @@ func (self *Server) handleConnection(conn net.Conn) {
 
 	go cn.Handle()
 
+	cn.RequestServices()
+
 }
 
 func (self *Server) Call(method string, ctx interface{}, arg interface{}, reply interface{}) error {
 
-	//msg := executor.CallDescription{}
+	channel := self.getService(method)
 
+	if channel == nil {
+		return fmt.Errorf("service not found")
+	}
+
+	return channel.Call(method, ctx, arg, reply)
+
+}
+
+func (self *Server) getService(name string) *Channel {
+	//dot := strings.IndexOf(".")
+	for _, c := range self.channels {
+		if c.HasService(name) {
+			return c
+		}
+	}
 	return nil
 }
 

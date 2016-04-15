@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kildevaeld/dict"
 	"github.com/kildevaeld/executor"
@@ -29,6 +30,7 @@ func wrapError(msg string, err error) error {
 
 type Call struct {
 	ServiceMethod string
+	id            MsgId
 	Ctx           interface{}
 	Arg           interface{}
 	Reply         interface{}
@@ -41,7 +43,9 @@ var callPool sync.Pool
 func init() {
 	callPool = sync.Pool{
 		New: func() interface{} {
-			return &Call{}
+			return &Call{
+				Done: make(chan *Call, 10),
+			}
 		},
 	}
 }
@@ -66,6 +70,7 @@ type Channel struct {
 	id        int
 	pending   map[MsgId]*Call
 	lock      sync.Mutex
+	services  ServiceList
 }
 
 /*func (self *Channel) Id() MsgId {
@@ -77,35 +82,106 @@ func (self *Channel) Errors() <-chan error {
 }
 
 func (self *Channel) Handle() error {
-	self.pending = make(map[MsgId]*Call)
 
 	go self.handleRead()
 
 	return nil
 }
 
-func (self *Channel) RequestServices() {
-	call := callPool.Get().(*Call)
+func (self *Channel) RequestServices() ServiceList {
 
-	call.Reply = &dict.Map{}
+	call, id := self.getCall()
+	defer self.FreeCall(call)
+
+	var reply []executor.ServiceDesc
+	call.Reply = &reply
 	call.Done = make(chan *Call, 100)
-	id := getMsgID()
 
-	self.lock.Lock()
-	self.pending[id] = call
-	self.lock.Unlock()
-
-	writeMessage(self.conn, id, SchemaRequestMsg, nil)
+	self.send(call, id, SchemaRequestMsg, false)
 
 	<-call.Done
 
-	fmt.Printf("%#v", call.Reply)
+	if call.Error != nil {
+		self.errorChan <- wrapError("RequestService", call.Error)
+	}
 
-	self.FreeCall(call)
+	self.lock.Lock()
+	self.services.Append(reply...)
+	//self.services = append(self.services, reply...)
+	self.lock.Unlock()
+	return self.services
+}
+
+func (self *Channel) HasService(method string) bool {
+
+	dot := strings.LastIndex(method, ".")
+	if dot < 0 {
+		return false
+	}
+	self.lock.Lock()
+	services := self.services
+	self.lock.Unlock()
+
+	for _, s := range services {
+		if s.Name != method[:dot] {
+			continue
+		}
+		for _, m := range s.Methods {
+			if m.Name == method[dot+1:] {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (self *Channel) Go(method string, ctx interface{}, arg interface{}, reply interface{}, done chan *Call) *Call {
+
+	call, id := self.getCall()
+	call.ServiceMethod = method
+	call.Ctx = ctx
+	call.Arg = arg
+	call.Reply = reply
+
+	if done == nil {
+		done = make(chan *Call, 10)
+	} else {
+		if cap(done) == 0 {
+			log.Panicf("rpc: done channel is unbuffered")
+		}
+	}
+
+	call.Done = done
+
+	self.send(call, id, RequestMsg, true)
+	return call
+}
+
+func (self *Channel) Call(method string, ctx interface{}, arg interface{}, reply interface{}) error {
+	call := <-self.Go(method, ctx, arg, reply, nil).Done
+	defer self.FreeCall(call)
+	return call.Error
 }
 
 func (self *Channel) FreeCall(call *Call) {
+	call.id = 0
+	close(call.Done)
 	callPool.Put(call)
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	delete(self.pending, call.id)
+}
+
+func (self *Channel) getCall() (*Call, MsgId) {
+	call := callPool.Get().(*Call)
+	id := getMsgID()
+	self.lock.Lock()
+
+	self.pending[id] = call
+	call.id = id
+	defer self.lock.Unlock()
+	return call, id
 }
 
 func (self *Channel) handleRead() {
@@ -215,37 +291,37 @@ func (self *Channel) handleSchemaRequest(msgType MessageType, id MsgId) {
 
 }
 
-func (self *Channel) Call(method string, ctx interface{}, arg interface{}, reply interface{}) (*Call, error) {
+func (self *Channel) send(call *Call, id MsgId, msgT MessageType, useDesc bool) {
+	dot := strings.LastIndex(call.ServiceMethod, ".")
 
-	dot := strings.LastIndex(method, ".")
-
-	if dot < 0 {
-		return nil, errors.New("invalid method name. Usage Service.Method")
+	clean := func() {
+		time.Sleep(100 * time.Millisecond)
+		call.done()
 	}
 
-	call := callPool.Get().(*Call)
-	call.ServiceMethod = method
-	call.Ctx = ctx
-	call.Arg = arg
-	call.Reply = reply
-	call.Done = make(chan *Call, 100)
-	id := getMsgID()
-	self.lock.Lock()
-	self.pending[id] = call
-	self.lock.Unlock()
+	if dot < 0 && useDesc {
+		call.Error = errors.New("invalid method name. Usage Service.Method")
+		clean()
+	} else {
+		var err error
+		if useDesc {
+			desc := executor.CallDescription{
+				Context:  call.Ctx,
+				Argument: call.Arg,
+				Service:  call.ServiceMethod[:dot],
+				Method:   call.ServiceMethod[dot+1:],
+			}
 
-	desc := executor.CallDescription{
-		Context:  ctx,
-		Argument: ctx,
-		Service:  method[:dot],
-		Method:   method[dot+1:],
+			err = self.writeStructMsg(id, msgT, desc)
+		} else {
+			err = writeMessage(self.conn, id, msgT, nil)
+		}
+
+		if err != nil {
+			clean()
+		}
 	}
 
-	if err := self.writeStructMsg(id, RequestMsg, desc); err != nil {
-		return nil, err
-	}
-
-	return call, nil
 }
 
 func NewChannel(id int, e *executor.Executor, conn net.Conn) *Channel {
@@ -253,7 +329,7 @@ func NewChannel(id int, e *executor.Executor, conn net.Conn) *Channel {
 		conn:     conn,
 		id:       id,
 		executor: e,
-		//id:   getID(),
+		pending:  make(map[MsgId]*Call),
 	}
 
 	return chann

@@ -13,6 +13,18 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+type MethodDesc struct {
+	Name  string                 `json:"name"`
+	Ctx   map[string]interface{} `json:"ctx"`
+	Arg   map[string]interface{} `json:"arg"`
+	Reply map[string]interface{} `json:"reply"`
+}
+
+type ServiceDesc struct {
+	Name    string       `json:"name"`
+	Methods []MethodDesc `json:"methods"`
+}
+
 type CallDescription struct {
 	Service  string      `json:"service"`
 	Method   string      `json:"method"`
@@ -175,11 +187,31 @@ func (self *Executor) CallWithJSON(bs []byte, v interface{}) error {
 
 	if out != nil {
 
+		getValue := func(isDict bool) interface{} {
+			switch v := out.(type) {
+			case *dict.Map:
+				if isDict {
+					return *v
+				}
+				return (*v).ToMap()
+			case *map[string]interface{}:
+				if isDict {
+					return dict.Map(*v)
+				}
+				return *v
+			default:
+				if structs.IsStruct(out) {
+					return structs.Map(v)
+				}
+			}
+			return nil
+		}
+
 		switch m := v.(type) {
 		case *dict.Map:
-			*m = structs.Map(out)
+			*m = getValue(true).(dict.Map)
 		case *map[string]interface{}:
-			*m = structs.Map(out)
+			*m = getValue(false).(map[string]interface{})
 		}
 
 	}
@@ -196,18 +228,6 @@ func getValue(v reflect.Type, value interface{}) (interface{}, error) {
 		return nil, e
 	}
 	return n, e
-}
-
-type MethodDesc struct {
-	Name  string                 `json:"name"`
-	Ctx   map[string]interface{} `json:"ctx"`
-	Arg   map[string]interface{} `json:"arg"`
-	Reply map[string]interface{} `json:"reply"`
-}
-
-type ServiceDesc struct {
-	Name    string       `json:"name"`
-	Methods []MethodDesc `methods:"methods"`
 }
 
 func (self *Executor) GetServiceDescriptions() ([]byte, error) {
@@ -227,15 +247,9 @@ func (self *Executor) getDescriptions() ([]ServiceDesc, error) {
 
 	for name, _ := range self.services {
 
-		/*bs, err := self.GetServiceDescription(name)
-
-		if err != nil {
-			return nil, err
-		}*/
-
 		desc, e := self.getDescription(name)
 		if e != nil {
-			return nil, nil
+			return nil, e
 		}
 		out = append(out, desc)
 	}

@@ -16,6 +16,7 @@ import (
 // Precompute the reflect type for error.  Can't use error directly
 // because Typeof takes an empty interface value.  This is annoying.
 var typeOfError = reflect.TypeOf((*error)(nil)).Elem()
+var typeOfBytes = reflect.TypeOf([]byte(nil))
 
 // Is this an exported - upper case - name?
 func isExported(name string) bool {
@@ -124,6 +125,7 @@ func getType(t reflect.Type) (dict.Map, error) {
 		str = "boolean"
 	case reflect.Array, reflect.Slice:
 		str = "array"
+
 	default:
 		return nil, fmt.Errorf("wrong type: %v", t)
 
@@ -157,13 +159,21 @@ func getType(t reflect.Type) (dict.Map, error) {
 		}
 
 	} else if str == "array" {
-		target := t.Elem()
-		item, err := getType(target)
-		if err != nil {
-			return nil, err
+
+		if t == typeOfBytes {
+			// byte array
+			m["type"] = "string"
+			m["format"] = "base64"
+		} else {
+			target := t.Elem()
+			item, err := getType(target)
+			if err != nil {
+				return nil, err
+			}
+
+			m["items"] = []dict.Map{item}
 		}
 
-		m["items"] = item
 	}
 
 	return m, nil

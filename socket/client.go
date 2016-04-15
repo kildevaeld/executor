@@ -32,6 +32,14 @@ func (self *Client) Connect() error {
 	return nil
 }
 
+func (self *Client) GetServices() ServiceList {
+	return self.channel.RequestServices()
+}
+
+func (self *Client) Call(method string, ctx interface{}, arg interface{}, reply interface{}) error {
+	return self.channel.Call(method, ctx, arg, reply)
+}
+
 func NewClient() *Client {
 	return &Client{
 		executor: executor.NewExecutor(),
