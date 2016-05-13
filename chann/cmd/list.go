@@ -66,7 +66,7 @@ to quickly create a Cobra application.`,
 				fmt.Printf("Service %s does not exists\n", service)
 				return
 			}
-			//fmt.Printf("Service: %s\nMethods: %s\n", service.Name)
+			fmt.Printf("Service: %s\nMethods: %s\n", service.Name, service.Methods)
 		} else {
 			fmt.Printf("Services:\n")
 			for _, service := range services {
