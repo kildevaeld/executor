@@ -119,7 +119,7 @@ func getType(t reflect.Type) (dict.Map, error) {
 		str = "number"
 	case reflect.String:
 		str = "string"
-	case reflect.Struct:
+	case reflect.Struct, reflect.Map:
 		str = "object"
 	case reflect.Bool:
 		str = "boolean"
@@ -127,6 +127,7 @@ func getType(t reflect.Type) (dict.Map, error) {
 		str = "array"
 
 	default:
+
 		return nil, fmt.Errorf("wrong type: %v", t)
 
 	}
@@ -136,9 +137,12 @@ func getType(t reflect.Type) (dict.Map, error) {
 	m["type"] = str
 
 	if str == "object" {
+		m["additionalProperties"] = false
 		if t == reflect.TypeOf(time.Time{}) {
 			m["type"] = "string"
 			m["format"] = "date-time"
+		} else if kind == reflect.Map {
+			m["additionalProperties"] = true
 		} else {
 			ps := dict.NewMap()
 

@@ -59,7 +59,7 @@ func (self *Executor) Register(name string, v interface{}) error {
 		return fmt.Errorf("service '%s' already defined", name)
 	}
 
-	s.method = suitableMethods(s.typ, true)
+	s.method = suitableMethods(s.typ, false)
 
 	if len(s.method) == 0 {
 		return nil
@@ -242,6 +242,12 @@ func (self *Executor) GetServiceDescriptions() ([]byte, error) {
 
 }
 
+func (self *Executor) GetServiceDescriptions2() ([]ServiceDesc, error) {
+
+	return self.getDescriptions()
+
+}
+
 func (self *Executor) getDescriptions() ([]ServiceDesc, error) {
 	var out []ServiceDesc
 
@@ -255,6 +261,10 @@ func (self *Executor) getDescriptions() ([]ServiceDesc, error) {
 	}
 
 	return out, nil
+}
+
+func (self *Executor) GetDescription2(name string) (ServiceDesc, error) {
+	return self.getDescription(name)
 }
 
 func (self *Executor) getDescription(name string) (ServiceDesc, error) {
@@ -280,7 +290,7 @@ func (self *Executor) getDescription(name string) (ServiceDesc, error) {
 			return ServiceDesc{}, err
 		}
 
-		if reply, err = getType(m.CtxType()); err != nil {
+		if reply, err = getType(m.ReplyType()); err != nil {
 			return ServiceDesc{}, err
 		}
 
