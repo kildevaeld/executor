@@ -110,6 +110,13 @@ func (self *Executor) Call(method string, ctx interface{}, args interface{}, ret
 	return nil
 }
 
+func (self *Executor) GetService(service string) Service {
+	self.mutex.RLock()
+	s := self.services[service]
+	self.mutex.RUnlock()
+	return s
+}
+
 func (self *Executor) CallWithJSON(bs []byte, v interface{}) error {
 
 	var desc CallDescription
@@ -132,7 +139,7 @@ func (self *Executor) CallWithJSON(bs []byte, v interface{}) error {
 		return fmt.Errorf("service '%s' has no method: '%s'", desc.Service, desc.Method)
 	}
 
-	schema := getMethodSchema(desc.Method, meth)
+	schema := GetMethodSchema(desc.Method, meth)
 
 	d := dict.Map{
 		"context":  desc.Context,
@@ -153,11 +160,11 @@ func (self *Executor) CallWithJSON(bs []byte, v interface{}) error {
 
 	var arg, ctx interface{}
 
-	if arg, e = getValue(meth.ArgType(), desc.Argument); e != nil {
+	if arg, e = GetValue(meth.ArgType(), desc.Argument); e != nil {
 		return e
 	}
 
-	if ctx, e = getValue(meth.CtxType(), desc.Context); e != nil {
+	if ctx, e = GetValue(meth.CtxType(), desc.Context); e != nil {
 		return e
 	}
 
@@ -219,7 +226,7 @@ func (self *Executor) CallWithJSON(bs []byte, v interface{}) error {
 	return e
 }
 
-func getValue(v reflect.Type, value interface{}) (interface{}, error) {
+func GetValue(v reflect.Type, value interface{}) (interface{}, error) {
 	b, _ := json.Marshal(value)
 	n := reflect.New(v).Interface()
 

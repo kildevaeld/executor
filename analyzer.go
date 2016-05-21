@@ -150,6 +150,10 @@ func getType(t reflect.Type) (dict.Map, error) {
 
 			for m := 0; m < t.NumField(); m++ {
 				field := t.Field(m)
+				if !isExported(field.Name) {
+					continue
+				}
+
 				tt, e := getType(field.Type)
 				if e != nil {
 					return nil, e
@@ -184,7 +188,7 @@ func getType(t reflect.Type) (dict.Map, error) {
 
 }
 
-func getMethodSchema(name string, meth MethodType) dict.Map {
+func GetMethodSchema(name string, meth MethodType) dict.Map {
 	out := dict.Map{
 		"type":  "object",
 		"title": name,
